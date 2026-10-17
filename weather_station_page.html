@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar Weather Station</title>
+<style>
+  :root {
+    --bg: #eef2f4;
+    --ink: #1c2a33;
+    --muted: #5f7480;
+    --line: #cbd6dc;
+    --accent: #1f6f8b;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11191e;
+      --ink: #e6eef2;
+      --muted: #8fa5b1;
+      --line: #2a3a44;
+      --accent: #5fb4d1;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 56px;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .sub { margin: 0 0 32px; color: var(--muted); }
+
+  .gauge {
+    border: 1px solid var(--line);
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+  }
+  .gauge iframe {
+    width: 450px;
+    max-width: 100%;
+    height: 260px;
+    border: 0;
+    background: #fff;
+  }
+
+  h2 {
+    margin: 40px 0 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  dl { margin: 0; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+  dd small { font-size: 0.85rem; color: var(--muted); margin-left: 4px; }
+  #status { margin-top: 12px; color: var(--muted); font-size: 0.9rem; }
+  #status.error { color: #b3402f; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Solar Weather Station</h1>
+  <p class="sub">Live conditions from the garden station, via ThingSpeak.</p>
+
+  <section class="gauge" aria-label="ThingSpeak gauge">
+    <iframe
+      src="https://thingspeak.com/channels/3538609/widgets/1318163"
+      title="Weather station gauge"
+      loading="lazy"></iframe>
+  </section>
+
+  <h2>Latest readings</h2>
+  <dl id="readings">
+    <div class="row"><dt>Temperature</dt><dd id="f1">--<small>°C</small></dd></div>
+    <div class="row"><dt>Humidity</dt><dd id="f2">--<small>%</small></dd></div>
+    <div class="row"><dt>Pressure (sea level)</dt><dd id="f3">--<small>hPa</small></dd></div>
+    <div class="row"><dt>Dew point</dt><dd id="f6">--<small>°C</small></dd></div>
+    <div class="row"><dt>Battery</dt><dd id="f4">--<small>V</small></dd></div>
+    <div class="row"><dt>WiFi signal</dt><dd id="f5">--<small>dBm</small></dd></div>
+  </dl>
+  <p id="status">Loading latest data…</p>
+</main>
+
+<script>
+  // If your channel is private, add your READ key to the end of this address:
+  //   ...feeds/last.json?api_key=YOUR_READ_KEY
+  var FEED_URL = "https://api.thingspeak.com/channels/3538609/feeds/last.json";
+  var REFRESH_SECONDS = 60;
+
+  var decimals = { field1: 1, field2: 0, field3: 1, field4: 2, field5: 0, field6: 1 };
+  var ids      = { field1: "f1", field2: "f2", field3: "f3", field4: "f4", field5: "f5", field6: "f6" };
+
+  function setValue(key, raw) {
+    var el = document.getElementById(ids[key]);
+    var unit = el.querySelector("small").outerHTML;
+    var n = parseFloat(raw);
+    el.innerHTML = (isNaN(n) ? "--" : n.toFixed(decimals[key])) + unit;
+  }
+
+  function load() {
+    var status = document.getElementById("status");
+    fetch(FEED_URL + (FEED_URL.indexOf("?") > -1 ? "&" : "?") + "t=" + Date.now())
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        Object.keys(ids).forEach(function (k) { setValue(k, d[k]); });
+        var when = new Date(d.created_at);
+        status.className = "";
+        status.textContent = "Last reading " + when.toLocaleString() +
+          ". This page checks again every " + REFRESH_SECONDS + " seconds.";
+      })
+      .catch(function () {
+        status.className = "error";
+        status.textContent = "Couldn't load readings. Check that the channel is public, or add your Read API key to FEED_URL in this file.";
+      });
+  }
+
+  load();
+  setInterval(load, REFRESH_SECONDS * 1000);
+</script>
+</body>
+</html>
